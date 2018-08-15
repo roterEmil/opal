@@ -17,6 +17,7 @@ import org.opalj.ai.common.SimpleAIKey
 import org.opalj.ai.domain.RecordDefUse
 import org.opalj.br.DefinedMethod
 import org.opalj.br.Method
+import org.opalj.br.DeclaredMethod
 import org.opalj.br.analyses.Project
 import org.opalj.br.analyses.SomeProject
 import org.opalj.br.analyses.DeclaredMethodsKey
@@ -87,6 +88,7 @@ object Purity {
             "[-debug] (enable debug output from PropertyStore)\n"+
             "[-multi] (analyzes multiple projects in the subdirectories of -cp)\n"+
             "[-eval <path to evaluation directory>]\n"+
+            "[-packages <colon separated list of packages, e.g. java/util:javax>]\n"+
             "Example:\n\tjava …PurityAnalysisEvaluation -JDK -individual -closedWorld"
     }
 
@@ -128,7 +130,8 @@ object Purity {
         closedWorldAssumption: Boolean,
         eagerTAC:              Boolean,
         debug:                 Boolean,
-        evaluationDir:         Option[File]
+        evaluationDir:         Option[File],
+        packages:              Option[Array[String]]
     ): Unit = {
         val classFiles = projectDir match {
             case Some(dir) ⇒ JavaClassFileReader().ClassFiles(cp.toPath.resolve(dir).toFile)
@@ -143,7 +146,8 @@ object Purity {
         val JDKFiles = if (withoutJDK) Traversable.empty
         else JavaClassFileReader().ClassFiles(JRELibraryFolder)
 
-        val dirName = if (cp eq JRELibraryFolder) "JDK" else cp.getName
+        val isJDK: Boolean = cp eq JRELibraryFolder
+        val dirName = if (isJDK) "JDK" else cp.getName
         val projectEvalDir = evaluationDir.map(new File(_, dirName))
         if (projectEvalDir.isDefined && !projectEvalDir.get.exists()) projectEvalDir.get.mkdir()
 
@@ -196,8 +200,26 @@ object Purity {
         }
 
         val declaredMethods = project.get(DeclaredMethodsKey)
-        val projMethods = for (cf ← project.allProjectClassFiles; m ← cf.methodsWithBody)
-            yield declaredMethods(m)
+        val projectMethods: Traversable[DefinedMethod] =
+            for (cf ← project.allProjectClassFiles; m ← cf.methodsWithBody)
+                yield declaredMethods(m)
+
+        val projMethods = projectMethods.filter { m ⇒
+            val pn = m.definedMethod.classFile.thisType.packageName
+            packages match {
+                case None ⇒
+                    isJDK || !pn.startsWith("java/") && !pn.startsWith("javax") &&
+                        !pn.startsWith("javafx") && !pn.startsWith("jdk") &&
+                        !pn.startsWith("sun") && !pn.startsWith("oracle") &&
+                        !pn.startsWith("com/sun") && !pn.startsWith("com/oracle") &&
+                        !pn.startsWith("netscape") && !pn.startsWith("org/ietf/jgss") &&
+                        !pn.startsWith("org/jcp/xml/dsig/internal") &&
+                        !pn.startsWith("org/omg") && !pn.startsWith("org/w3c/dom") &&
+                        !pn.startsWith("org/xml/sax")
+                case Some(ps) ⇒
+                    ps.exists(pn.startsWith(_))
+            }
+        }
 
         time {
             val pks: Set[PropertyKind] = support.flatMap(
@@ -236,10 +258,27 @@ object Purity {
             }
         }
 
-        val purityEs = propertyStore(projMethods, fpcf.properties.Purity.key).filter {
+        val entitiesWithPurity = propertyStore(projMethods, fpcf.properties.Purity.key).filter {
             case FinalEP(_, p) ⇒ p ne ImpureByLackOfInformation
             case ep            ⇒ throw new RuntimeException(s"non final purity result $ep")
         }
+
+        val purityEs = entitiesWithPurity.filter { ep ⇒
+            val pn = ep.e.asInstanceOf[DeclaredMethod].declaringClassType.asObjectType.packageName
+            packages match {
+                case None ⇒
+                    isJDK || !pn.startsWith("java/") && !pn.startsWith("javax") &&
+                        !pn.startsWith("javafx") && !pn.startsWith("jdk") &&
+                        !pn.startsWith("sun") && !pn.startsWith("oracle") &&
+                        !pn.startsWith("com/sun") && !pn.startsWith("com/oracle") &&
+                        !pn.startsWith("netscape") && !pn.startsWith("org/ietf/jgss") &&
+                        !pn.startsWith("org/jcp/xml/dsig/internal") &&
+                        !pn.startsWith("org/omg") && !pn.startsWith("org/w3c/dom") &&
+                        !pn.startsWith("org/xml/sax")
+                case Some(ps) ⇒
+                    ps.exists(pn.startsWith(_))
+            }
+        }.toSeq
 
         def isExternal(dm: DefinedMethod, p: IntTrieSet): Boolean = {
             !dm.definedMethod.isStatic && p.size == 1 && p.head == 0
@@ -290,6 +329,56 @@ object Purity {
                             s"${lbImpure.size};${purityEs.size}"
                     )
                 } else {
+                    val result =
+                        propertyStore.toString(false)+
+                            "\ncompile-time pure:                     "+compileTimePure.size+
+                            "\nAt least pure:                         "+pure.size+
+                            "\nAt least domain-specficic pure:        "+dPure.size+
+                            "\nAt least side-effect free:             "+sideEffectFree.size+
+                            "\nAt least d-s side effect free:         "+dSideEffectFree.size+
+                            "\nAt least externally pure:              "+externallyPure.size+
+                            "\nAt least d-s externally pure:          "+dExternallyPure.size+
+                            "\nAt least externally side-effect free:  "+externallySideEffectFree.size+
+                            "\nAt least d-s ext. side-effect free:    "+dExternallySideEffectFree.size+
+                            "\nAt least contextually pure:            "+contextuallyPure.size+
+                            "\nAt least d-s contextually pure:        "+dContextuallyPure.size+
+                            "\nAt least contextually side-effect free:"+contextuallySideEffectFree.size+
+                            "\nAt least d-s cont. side-effect free:   "+dContextuallySideEffectFree.size+
+                            "\nImpure:                                "+lbImpure.size+
+                            "\nTotal:                                 "+purityEs.size
+                    Console.println(result)
+                    Console.println(s"Analysis time: $analysisTime")
+                    for (m ← compileTimePure) {
+                        val sig = m.definedMethod.parameterTypes.view.map(_.toJava).mkString(s"${m.name}(", ",", ")")
+                        resultsWriter.println(
+                            s"${m.definedMethod.classFile.thisType.toJava}.$sig"
+                        )
+                    }
+                    for (m ← pure) {
+                        val sig = m.definedMethod.parameterTypes.view.map(_.toJava).mkString(s"${m.name}(", ",", ")")
+                        resultsWriter.println(
+                            s"${m.definedMethod.classFile.thisType.toJava}.$sig"
+                        )
+                    }
+                    for (m ← dPure) {
+                        val sig = m.definedMethod.parameterTypes.view.map(_.toJava).mkString(s"${m.name}(", ",", ")")
+                        resultsWriter.println(
+                            s"${m.definedMethod.classFile.thisType.toJava}.$sig"
+                        )
+                    }
+                    for (m ← sideEffectFree) {
+                        val sig = m.definedMethod.parameterTypes.view.map(_.toJava).mkString(s"${m.name}(", ",", ")")
+                        resultsWriter.println(
+                            s"${m.definedMethod.classFile.thisType.toJava}.$sig"
+                        )
+                    }
+                    for (m ← dSideEffectFree) {
+                        val sig = m.definedMethod.parameterTypes.view.map(_.toJava).mkString(s"${m.name}(", ",", ")")
+                        resultsWriter.println(
+                            s"${m.definedMethod.classFile.thisType.toJava}.$sig"
+                        )
+                    }
+                    /*
                     for (m ← compileTimePure) {
                         resultsWriter.println(s"${m.definedMethod.toJava} => compile time pure")
                     }
@@ -331,7 +420,7 @@ object Purity {
                     }
                     for (m ← lbImpure) {
                         resultsWriter.println(s"${m.definedMethod.toJava} => impure")
-                    }
+                    }*/
                 }
             } finally {
                 if (resultsWriter != null) resultsWriter.close()
@@ -375,6 +464,7 @@ object Purity {
         var debug = false
         var multiProjects = false
         var evaluationDir: Option[File] = None
+        var packages: Option[Array[String]] = None
 
         // PARSING PARAMETERS
         var i = 0
@@ -404,6 +494,7 @@ object Purity {
                 case "-multi"       ⇒ multiProjects = true
                 case "-eval"        ⇒ evaluationDir = Some(new File(readNextArg()))
                 case "-noJDK"       ⇒ withoutJDK = true
+                case "-packages"    ⇒ packages = Some(readNextArg().split(':'))
                 case "-JDK" ⇒
                     cp = JRELibraryFolder; withoutJDK = true
 
@@ -472,7 +563,8 @@ object Purity {
                         cwa,
                         eagerTAC,
                         debug,
-                        evaluationDir
+                        evaluationDir,
+                        packages
                     )
                 }
             } else {
@@ -488,7 +580,8 @@ object Purity {
                     cwa,
                     eagerTAC,
                     debug,
-                    evaluationDir
+                    evaluationDir,
+                    packages
                 )
             }
         }(t ⇒ println("evaluation time: "+t.toSeconds))
