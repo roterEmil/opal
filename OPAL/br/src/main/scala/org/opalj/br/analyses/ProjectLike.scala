@@ -823,8 +823,11 @@ abstract class ProjectLike extends ClassFileRepository { project ⇒
      * Convience method; see `virtualCall(callerPackageName:String,declaringType:ReferenceType*`
      * for details.
      */
-    def virtualCall(callerPackageName: String, i: INVOKEVIRTUAL): SomeSet[Method] = {
-        virtualCall(callerPackageName, i.declaringClass, i.name, i.methodDescriptor)
+    def virtualCall(
+        callerClassType: ObjectType,
+        i:               INVOKEVIRTUAL
+    ): SomeSet[Method] = {
+        virtualCall(callerClassType, i.declaringClass, i.name, i.methodDescriptor)
     }
 
     /**
@@ -836,10 +839,10 @@ abstract class ProjectLike extends ClassFileRepository { project ⇒
      *          descriptor if we have a signature polymorphic call!
      */
     def virtualCall(
-        callerPackageName: String,
-        declaringType:     ReferenceType, // an interface, class or array type to be precise
-        name:              String,
-        descriptor:        MethodDescriptor
+        callerClassType: ObjectType,
+        declaringType:   ReferenceType, // an interface, class or array type to be precise
+        name:            String,
+        descriptor:      MethodDescriptor
     ): SomeSet[Method] = {
         if (declaringType.isArrayType) {
             return instanceCall(ObjectType.Object, ObjectType.Object, name, descriptor).toSet
@@ -853,10 +856,27 @@ abstract class ProjectLike extends ClassFileRepository { project ⇒
         val declaringClassType = declaringType.asObjectType
         var methods = SomeSet.empty[Method]
 
+        if (declaringClassType eq callerClassType) {
+            // a virtual invoke can resolve to a private method when it matches the signature
+            // of an overridable method from a supertype and is placed in
+            val result = classFile(declaringClassType) match {
+                case Some(classFile) ⇒
+                    classFile.findMethod(name, descriptor) match {
+                        case Some(method) ⇒ Success(method)
+                        case _            ⇒ Empty
+                    }
+                case None ⇒ Empty
+            }
+            if (result.hasValue) {
+                return SomeSet(result.value);
+            }
+        }
+
         val initialMethodsOption = instanceMethods.get(declaringClassType)
         if (initialMethodsOption.isEmpty)
             return methods;
 
+        val callerPackageName = callerClassType.packageName
         // Let's find the (concrete) method defined by this type or a supertype if it exists.
         // We have to check the declaring package if the method has package visibility to ensure
         // that we find the correct method!

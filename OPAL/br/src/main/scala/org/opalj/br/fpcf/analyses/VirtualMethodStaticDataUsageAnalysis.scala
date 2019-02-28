@@ -44,18 +44,19 @@ class VirtualMethodStaticDataUsageAnalysis private[analyses] (
 
         val cfo = if (dm.declaringClassType.isArrayType) project.ObjectClassFile
         else project.classFile(dm.declaringClassType.asObjectType)
+        val callerClassType = dm.definedMethod.classFile.thisType
         val methods =
             if (cfo.isDefined && cfo.get.isInterfaceDeclaration)
                 project.interfaceCall(dm.declaringClassType.asObjectType, dm.name, dm.descriptor)
             else if (dm.hasSingleDefinedMethod && dm.definedMethod.isPackagePrivate)
                 project.virtualCall(
-                    dm.definedMethod.classFile.thisType.packageName,
+                    callerClassType,
                     dm.declaringClassType,
                     dm.name,
                     dm.descriptor
                 )
             else project.virtualCall(
-                "" /* package is irrelevant, must be public interface methods */ ,
+                callerClassType,
                 dm.declaringClassType,
                 dm.name,
                 dm.descriptor

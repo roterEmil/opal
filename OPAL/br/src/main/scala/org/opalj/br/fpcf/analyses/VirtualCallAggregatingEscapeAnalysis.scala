@@ -56,14 +56,14 @@ class VirtualCallAggregatingEscapeAnalysis private[analyses] ( final val project
                 project.interfaceCall(dm.declaringClassType.asObjectType, dm.name, dm.descriptor)
             else if (dm.hasSingleDefinedMethod && dm.definedMethod.isPackagePrivate)
                 project.virtualCall(
-                    dm.definedMethod.classFile.thisType.packageName,
+                    dm.definedMethod.classFile.thisType,
                     dm.declaringClassType,
                     dm.name,
                     dm.descriptor
                 )
             else project.virtualCall(
-                "" /* package is irrelevant, must be public interface methods */ ,
-                dm.declaringClassType,
+                dm.definedMethod.classFile.thisType,
+                dm.definedMethod.classFile.thisType,
                 dm.name,
                 dm.descriptor
             )

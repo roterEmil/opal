@@ -50,7 +50,7 @@ class VirtualReturnValueFreshnessAnalysis private[analyses] (
         }
 
         val methods = project.virtualCall(
-            m.declaringClassType.asObjectType.packageName,
+            m.declaringClassType.asObjectType,
             m.declaringClassType,
             m.name,
             m.descriptor

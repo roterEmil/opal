@@ -419,7 +419,7 @@ class ProjectTest extends FlatSpec with Matchers {
             val classType = ObjectType("methods/b/B")
             val implementingMethods =
                 methodsProject.virtualCall(
-                    "methods/b", classType, "publicMethod", MethodDescriptor.NoArgsAndReturnVoid
+                    classType, classType, "publicMethod", MethodDescriptor.NoArgsAndReturnVoid
                 )
 
             implementingMethods.size should be(1)
