@@ -858,7 +858,8 @@ abstract class ProjectLike extends ClassFileRepository { project ⇒
 
         if (declaringClassType eq callerClassType) {
             // a virtual invoke can resolve to a private method when it matches the signature
-            // of an overridable method from a supertype and is placed in
+            // of an overridable method from a supertype and is placed within the class where
+            // the private method is defined
             val result = classFile(declaringClassType) match {
                 case Some(classFile) ⇒
                     classFile.findMethod(name, descriptor) match {
