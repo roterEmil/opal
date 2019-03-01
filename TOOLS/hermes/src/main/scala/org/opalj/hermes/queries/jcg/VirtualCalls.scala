@@ -54,7 +54,7 @@ class VirtualCalls(implicit hermes: HermesConfig) extends DefaultFeatureQuery {
 
             val kindID = invokeKind.opcode match {
                 case INVOKEVIRTUAL.opcode ⇒ {
-                    val targets = project.virtualCall(callerType.packageName, invokeKind.asInstanceOf[INVOKEVIRTUAL])
+                    val targets = project.virtualCall(callerType, invokeKind.asInstanceOf[INVOKEVIRTUAL])
                     targets.size match {
                         case 0 ⇒ -1 /* boring call site */
                         case 1 ⇒ 0 /* single target cs */
