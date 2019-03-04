@@ -40,14 +40,14 @@ abstract class PKECPropertyStore extends ParallelPropertyStore { store ⇒
     protected[this] def forkResultHandler(r: PropertyComputationResult): Unit
 
     protected[this] def forkOnUpdateContinuation(
-        c:  OnUpdateContinuation,
-        e:  Entity,
-        pk: SomePropertyKey
+        dependerEPK: SomeEPK,
+        e:           Entity,
+        pk:          SomePropertyKey
     ): Unit
 
     protected[this] def forkOnUpdateContinuation(
-        c:       OnUpdateContinuation,
-        finalEP: SomeFinalEP
+        dependerEPK: SomeEPK,
+        finalEP:     SomeFinalEP
     ): Unit
 
     protected[this] def parallelize(r: Runnable): Unit
@@ -60,7 +60,7 @@ abstract class PKECPropertyStore extends ParallelPropertyStore { store ⇒
 
     // Per PropertyKind we use one concurrent hash map to store the entities' properties.
     // The value encompasses the current property along with some helper information.
-    private[this] val properties: Array[ConcurrentHashMap[Entity, EPKState]] = {
+    protected[this] val properties: Array[ConcurrentHashMap[Entity, EPKState]] = {
         Array.fill(SupportedPropertyKinds) { new ConcurrentHashMap() }
     }
 
@@ -69,7 +69,7 @@ abstract class PKECPropertyStore extends ParallelPropertyStore { store ⇒
     // are guaranteed to be visible to all relevant tasks.
 
     /** Computations that will be triggered when a new property becomes available. */
-    private[this] val triggeredComputations: Array[Array[SomePropertyComputation]] = {
+    protected[this] val triggeredComputations: Array[Array[SomePropertyComputation]] = {
         new Array(SupportedPropertyKinds)
     }
 
@@ -295,19 +295,11 @@ abstract class PKECPropertyStore extends ParallelPropertyStore { store ⇒
     override def handleResult(r: PropertyComputationResult): Unit = forkResultHandler(r)
 
     private[this] def notifyDepender(dependerEPK: SomeEPK, eps: SomeEPS): Unit = {
-        val dependerState = properties(dependerEPK.pk.id).get(dependerEPK.e)
-        val c = dependerState.getAndClearOnUpdateComputation()
-        if (c != null) {
-            forkOnUpdateContinuation(c, eps.e, eps.pk)
-        }
+        forkOnUpdateContinuation(dependerEPK, eps.e, eps.pk)
     }
 
     private[this] def notifyDepender(dependerEPK: SomeEPK, finalEP: SomeFinalEP): Unit = {
-        val dependerState = properties(dependerEPK.pk.id).get(dependerEPK.e)
-        val c = dependerState.getAndClearOnUpdateComputation()
-        if (c != null) {
-            forkOnUpdateContinuation(c, finalEP)
-        }
+        forkOnUpdateContinuation(dependerEPK, finalEP)
     }
 
     def clearDependees(depender: SomeEPK, dependees: Traversable[SomeEOptionP]): Unit = {
@@ -397,10 +389,7 @@ abstract class PKECPropertyStore extends ParallelPropertyStore { store ⇒
                 if (currentDependee.isUpdatedComparedTo(processedDependee)) {
                     // A dependee was updated; let's trigger the OnUpdateContinuation if it
                     // wasn't already triggered concurrently.
-                    val currentC = state.getAndClearOnUpdateComputation()
-                    if (currentC != null) {
-                        forkOnUpdateContinuation(currentC, processedDependee.e, processedDependee.pk)
-                    }
+                    forkOnUpdateContinuation(dependerEPK, processedDependee.e, processedDependee.pk)
                     false // we don't need to register further dependers
                 } else {
                     true
