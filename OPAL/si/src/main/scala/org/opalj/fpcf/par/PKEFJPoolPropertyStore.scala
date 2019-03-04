@@ -72,28 +72,36 @@ final class     PKEFJPoolPropertyStore private (
     }
 
     override protected[this] def forkOnUpdateContinuation(
-        c:  OnUpdateContinuation,
-        e:  Entity,
-        pk: SomePropertyKey
+        dependerEPK: SomeEPK,
+        e:           Entity,
+        pk:          SomePropertyKey
     ): Unit = {
         pool.execute(() ⇒ {
             if (doTerminate) throw new InterruptedException();
-            // get the newest value before we actually call the onUpdateContinuation
-            val newEPS = store(e, pk).asEPS
-            // IMPROVE ... see other forkOnUpdateContinuation
-            store.processResult(c(newEPS))
+            val dependerState = properties(dependerEPK.pk.id).get(dependerEPK.e)
+            val c = dependerState.getAndClearOnUpdateComputation()
+            if (c != null) {
+                // get the newest value before we actually call the onUpdateContinuation
+                val newEPS = store(e, pk).asEPS
+                // IMPROVE ... see other forkOnUpdateContinuation
+                store.processResult(c(newEPS))
+            }
         })
         incrementScheduledTasksCounter()
     }
 
     override protected[this] def forkOnUpdateContinuation(
-        c:       OnUpdateContinuation,
-        finalEP: SomeFinalEP
+        dependerEPK: SomeEPK,
+        finalEP:     SomeFinalEP
     ): Unit = {
         pool.execute(() ⇒ {
             if (doTerminate) throw new InterruptedException();
-            // IMPROVE: Instead of naively calling "c" with finalEP, it may be worth considering which other updates have happened to figure out which update may be the "beste"
-            store.processResult(c(finalEP))
+            val dependerState = properties(dependerEPK.pk.id).get(dependerEPK.e)
+            val c = dependerState.getAndClearOnUpdateComputation()
+            if (c != null) {
+                // IMPROVE: Instead of naively calling "c" with finalEP, it may be worth considering which other updates have happened to figure out which update may be the "beste"
+                store.processResult(c(finalEP))
+            }
         })
         incrementScheduledTasksCounter()
     }
