@@ -4,6 +4,8 @@ package tac
 package fpcf
 package analyses
 
+import java.util.concurrent.ConcurrentHashMap
+
 import scala.collection.immutable.ListSet
 
 import org.opalj.log.LogContext
@@ -174,6 +176,8 @@ class TestTaintAnalysis private (
             case _ ⇒ in
         }
 
+    val output: java.util.Set[String] = ConcurrentHashMap.newKeySet()
+
     override def callFlow(
         stmt:   Statement,
         callee: DeclaredMethod,
@@ -194,8 +198,13 @@ class TestTaintAnalysis private (
                 case Variable(index) ⇒
                     asCall(stmt.stmt).params.exists(p ⇒ p.asVar.definedBy.contains(index))
                 case _ ⇒ false
-            })
-                println(s"Found flow: $stmt")
+            }){
+                val out = s"Found flow: $stmt"
+                println(out)
+                if (output.contains(out))
+                    println()
+                output.add(out)
+            }
             Set.empty
         } else if ((callee.descriptor.returnType eq ObjectType.Class) ||
             (callee.descriptor.returnType eq ObjectType.Object)) {
@@ -385,7 +394,8 @@ object TestTaintAnalysisRunner {
             PropertyStoreKey,
             (context: List[PropertyStoreContext[AnyRef]]) ⇒ {
                 implicit val lg: LogContext = p.logContext
-                PropertyStore.updateDebug(false)
+                PropertyStore.updateDebug(true)
+                PropertyStore.updateTraceFallbacks(true)
                 val ps =
                     if (args.contains("-seq"))
                         PKESequentialPropertyStore.apply(context: _*)
@@ -435,5 +445,7 @@ object TestTaintAnalysisRunner {
                 }
             }
         } { t ⇒ println(s"Time for taint-flow analysis: ${t.toSeconds}") }
+        println(ps.scheduledTasksCount)
+        println(ps.scheduledOnUpdateComputationsCount)
     }
 }

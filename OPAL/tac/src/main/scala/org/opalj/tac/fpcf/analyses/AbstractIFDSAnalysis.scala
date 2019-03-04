@@ -8,6 +8,7 @@ import scala.annotation.switch
 import scala.annotation.tailrec
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.collection.{Set ⇒ SomeSet}
 import scala.collection.mutable
@@ -106,7 +107,9 @@ abstract class AbstractIFDSAnalysis[DataFlowFact] extends FPCFAnalysis {
             // DataFlowFacts known to be valid on entry to a basic block
             var incoming: Map[BasicBlock, Set[DataFlowFact]] = Map.empty,
             // DataFlowFacts known to be valid on exit from a basic block on the cfg edge to a specific successor
-            var outgoing: Map[BasicBlock, Map[CFGNode, Set[DataFlowFact]]] = Map.empty
+            var outgoing: Map[BasicBlock, Map[CFGNode, Set[DataFlowFact]]] = Map.empty,
+            val isWorking: AtomicBoolean = new AtomicBoolean(false),
+            var seenTAC: Set[Method] = Set.empty
     )
 
     /**
@@ -251,12 +254,19 @@ abstract class AbstractIFDSAnalysis[DataFlowFact] extends FPCFAnalysis {
     }
 
     def c(eps: SomeEPS)(implicit state: State): ProperPropertyComputationResult = {
+        val wasWorking = state.isWorking.getAndSet(true)
+        if(wasWorking)
+            println("#############CONTINUATION CALLED TWICE################")
+
         (eps: @unchecked) match {
             case FinalE(e: (DeclaredMethod, DataFlowFact) @unchecked)     ⇒ handleCallUpdate(e)
 
             case InterimEUB(e: (DeclaredMethod, DataFlowFact) @unchecked) ⇒ handleCallUpdate(e)
 
             case FinalEP(m: Method, _: TACAI) ⇒
+                if(state.seenTAC.contains(m))
+                    println("$$$$$$$$$$$$$$$$ Second final update of TAC for " + m)
+                state.seenTAC += m
                 handleCallUpdate(m)
                 state.tacData -= m
                 state.tacDependees -= m
@@ -264,7 +274,11 @@ abstract class AbstractIFDSAnalysis[DataFlowFact] extends FPCFAnalysis {
             case InterimUBP(_: TACAI) ⇒ throw new UnknownError("Can not handle intermediate TAC")
         }
 
-        createResult()
+        val r = createResult()
+        val w2 = state.isWorking.getAndSet(false)
+        if(!w2)
+            println("!!!!!!!!!!!!!!!!!!!!!Confusing bug!!!!!!!!!!!!!!!!!!!!")
+        r
     }
 
     /**

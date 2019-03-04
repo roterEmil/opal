@@ -18,7 +18,7 @@ import org.opalj.log.LogContext
  *
  * @author Michael Eichberg
  */
-final class PKEFJPoolPropertyStore private (
+final class     PKEFJPoolPropertyStore private (
         val ctx:                                              Map[Class[_], AnyRef],
         val NumberOfThreadsForProcessingPropertyComputations: Int
 )(

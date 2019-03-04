@@ -317,6 +317,8 @@ abstract class PKECPropertyStore extends ParallelPropertyStore { store ⇒
         }
     }
 
+    val finallyUpdated: java.util.Set[SomeFinalEP] = ConcurrentHashMap.newKeySet()
+
     private[this] def finalUpdate(
         finalEP:                     SomeFinalEP,
         potentiallyIdemPotentUpdate: Boolean     = false
@@ -454,6 +456,8 @@ abstract class PKECPropertyStore extends ParallelPropertyStore { store ⇒
 
             case Result.id ⇒
                 val Result(finalEP) = r
+                //val str = finalEP.toString
+                //if(!str.startsWith("FinalEP((Defined")) println(str)
                 finalUpdate(finalEP)
 
             case MultiResult.id ⇒
