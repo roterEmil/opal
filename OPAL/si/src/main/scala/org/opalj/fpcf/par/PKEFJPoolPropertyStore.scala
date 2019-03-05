@@ -18,7 +18,7 @@ import org.opalj.log.LogContext
  *
  * @author Michael Eichberg
  */
-final class     PKEFJPoolPropertyStore private (
+final class PKEFJPoolPropertyStore private (
         val ctx:                                              Map[Class[_], AnyRef],
         val NumberOfThreadsForProcessingPropertyComputations: Int
 )(
@@ -28,7 +28,7 @@ final class     PKEFJPoolPropertyStore private (
 
     private[this] val pool: ForkJoinPool = {
         new ForkJoinPool(
-            64 /*NumberOfThreadsForProcessingPropertyComputations*/ ,
+            NumberOfThreadsForProcessingPropertyComputations,
             ForkJoinPool.defaultForkJoinWorkerThreadFactory,
             (_: Thread, e: Throwable) ⇒ { collectException(e) },
             false

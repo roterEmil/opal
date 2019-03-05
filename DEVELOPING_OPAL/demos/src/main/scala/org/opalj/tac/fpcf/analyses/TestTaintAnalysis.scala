@@ -198,7 +198,7 @@ class TestTaintAnalysis private (
                 case Variable(index) ⇒
                     asCall(stmt.stmt).params.exists(p ⇒ p.asVar.definedBy.contains(index))
                 case _ ⇒ false
-            }){
+            }) {
                 val out = s"Found flow: $stmt"
                 println(out)
                 if (output.contains(out))
