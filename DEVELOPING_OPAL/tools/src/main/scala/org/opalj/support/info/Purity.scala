@@ -417,6 +417,7 @@ object Purity {
             Console.println(result)
             Console.println(s"Call-graph time: $callGraphTime")
             Console.println(s"Analysis time: $analysisTime")
+            Console.println(ps.statistics)
         }
     }
 

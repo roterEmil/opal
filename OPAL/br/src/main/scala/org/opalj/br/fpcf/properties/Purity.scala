@@ -8,6 +8,8 @@ import scala.annotation.switch
 
 import org.opalj.collection.immutable.EmptyIntTrieSet
 import org.opalj.collection.immutable.IntTrieSet
+import org.opalj.fpcf.Entity
+import org.opalj.fpcf.OrderedProperty
 import org.opalj.fpcf.PropertyKey
 import org.opalj.fpcf.PropertyMetaInformation
 import org.opalj.fpcf.PropertyStore
@@ -177,6 +179,7 @@ sealed trait PurityPropertyMetaInformation extends PropertyMetaInformation {
  */
 sealed abstract class Purity
     extends IndividualProperty[Purity, VirtualMethodPurity]
+    with OrderedProperty
     with PurityPropertyMetaInformation {
 
     /**
@@ -217,6 +220,8 @@ sealed abstract class Purity
         if (modifiesParameters) Purity(flags & ~ModifiesParameters) else this
 
     val modifiedParams: IntTrieSet = EmptyIntTrieSet
+
+    override def checkIsEqualOrBetterThan(e: Entity, other: Purity): Unit = {}
 }
 
 object Purity extends PurityPropertyMetaInformation {
@@ -232,15 +237,15 @@ object Purity extends PurityPropertyMetaInformation {
             else if (dm.definedMethod.classFile.thisType ne dm.declaringClassType) None
             else {
                 val method = dm.definedMethod
+                val body = method.body
                 val declaringClassType = method.classFile.thisType
                 val methodDescriptor = method.descriptor
                 val methodName = method.name
-                val body = method.body
 
                 val isImpure = body.isEmpty || method.isSynchronized && method.isStatic
 
                 val isPure =
-                    !isImpure && !method.isSynchronized && !method.returnType.isReferenceType &&
+                    !isImpure && body.get.codeSize < 50 && !method.isSynchronized && !method.returnType.isReferenceType &&
                         body.get.instructions.forall { instruction ⇒
                             (instruction ne null) && ((instruction.opcode: @switch) match {
                                 case INVOKESPECIAL.opcode | INVOKESTATIC.opcode ⇒ instruction match {
@@ -364,6 +369,8 @@ case object CompileTimePure extends Purity {
 
     final val isRefinable = false
     override def meet(other: Purity): Purity = other
+
+    override def bottomness: Int = 5
 }
 
 /**
@@ -373,6 +380,8 @@ case object CompileTimePure extends Purity {
  */
 case object Pure extends Purity {
     final val flags = PureFlags
+
+    override def bottomness: Int = 4
 }
 
 /**
@@ -383,6 +392,8 @@ case object Pure extends Purity {
  */
 case object SideEffectFree extends Purity {
     final val flags = SideEffectFreeFlags
+
+    override def bottomness: Int = 3
 }
 
 /*
@@ -439,6 +450,8 @@ case class ContextuallyPure(override val modifiedParams: IntTrieSet) extends Pur
                 }
             }
     }
+
+    override def bottomness: Int = 3
 }
 
 /**
@@ -470,6 +483,8 @@ case class ContextuallySideEffectFree(override val modifiedParams: IntTrieSet) e
                 }
             }
     }
+
+    override def bottomness: Int = 2
 }
 
 /**
@@ -480,6 +495,8 @@ case class ContextuallySideEffectFree(override val modifiedParams: IntTrieSet) e
  */
 case object DPure extends Purity {
     final val flags = PureFlags | PerformsDomainSpecificOperations
+
+    override def bottomness: Int = 3
 }
 
 /**
@@ -490,6 +507,8 @@ case object DPure extends Purity {
  */
 case object DSideEffectFree extends Purity {
     final val flags = SideEffectFreeFlags | PerformsDomainSpecificOperations
+
+    override def bottomness: Int = 2
 }
 /*
 /**
@@ -540,6 +559,8 @@ case class DContextuallyPure(override val modifiedParams: IntTrieSet) extends Pu
                 }
             }
     }
+
+    override def bottomness: Int = 2
 }
 
 /**
@@ -559,6 +580,8 @@ case class DContextuallySideEffectFree(override val modifiedParams: IntTrieSet) 
         case DContextuallySideEffectFree(p) ⇒ DContextuallySideEffectFree(this.modifiedParams ++ p)
         case _                              ⇒ this
     }
+
+    override def bottomness: Int = 1
 }
 
 /**
@@ -568,6 +591,8 @@ case class DContextuallySideEffectFree(override val modifiedParams: IntTrieSet) 
 sealed abstract class ClassifiedImpure extends Purity {
     final val flags = ImpureFlags
     override val withoutContextual: ClassifiedImpure = this
+
+    override def bottomness: Int = 0
 }
 
 /**

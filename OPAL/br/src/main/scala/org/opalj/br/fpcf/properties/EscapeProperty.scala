@@ -235,6 +235,8 @@ case object NoEscape extends FinalEscapeProperty {
 
     override def isTop: Boolean = true
 
+    override def bottomness: Int = 5
+
 }
 
 /**
@@ -292,6 +294,8 @@ case object EscapeInCallee extends FinalEscapeProperty {
             case _            ⇒ that
         }
     }
+
+    override def bottomness: Int = 4
 }
 
 /**
@@ -345,6 +349,8 @@ case object EscapeViaParameter extends FinalEscapeProperty {
             case _                                    ⇒ that
         }
     }
+
+    override def bottomness: Int = 3
 }
 
 /**
@@ -397,6 +403,8 @@ case object EscapeViaReturn extends FinalEscapeProperty {
             case _                                       ⇒ that
         }
     }
+
+    override def bottomness: Int = 3
 }
 
 /**
@@ -450,6 +458,8 @@ case object EscapeViaAbnormalReturn extends FinalEscapeProperty {
         case EscapeViaParameterAndReturn.PID   ⇒ EscapeViaParameterAndNormalAndAbnormalReturn
         case _                                 ⇒ that
     }
+
+    override def bottomness: Int = 3
 }
 
 /**
@@ -491,6 +501,8 @@ case object EscapeViaParameterAndReturn extends FinalEscapeProperty {
         case EscapeViaNormalAndAbnormalReturn.PID         ⇒ EscapeViaParameterAndNormalAndAbnormalReturn
         case _                                            ⇒ that
     }
+
+    override def bottomness: Int = 2
 }
 
 /**
@@ -532,6 +544,8 @@ case object EscapeViaParameterAndAbnormalReturn extends FinalEscapeProperty {
         case EscapeViaNormalAndAbnormalReturn.PID ⇒ EscapeViaParameterAndNormalAndAbnormalReturn
         case _ ⇒ that
     }
+
+    override def bottomness: Int = 2
 }
 
 /**
@@ -573,6 +587,8 @@ case object EscapeViaNormalAndAbnormalReturn extends FinalEscapeProperty {
         case EscapeViaParameterAndAbnormalReturn.PID           ⇒ EscapeViaParameterAndNormalAndAbnormalReturn
         case _                                                 ⇒ that
     }
+
+    override def bottomness: Int = 2
 }
 
 /**
@@ -611,6 +627,8 @@ case object EscapeViaParameterAndNormalAndAbnormalReturn extends FinalEscapeProp
     }
 
     override def meet(that: FinalEscapeProperty): FinalEscapeProperty = this
+
+    override def bottomness: Int = 1
 }
 
 /**
@@ -655,6 +673,8 @@ trait GlobalEscape extends EscapeProperty {
     override def isTop: Boolean = false
 
     override def lessOrEqualRestrictive(that: EscapeProperty): Boolean = true
+
+    override def bottomness: Int = 0
 }
 
 /**
@@ -762,6 +782,8 @@ case class AtMost private (property: FinalEscapeProperty) extends EscapeProperty
     }
     //TODO REMOVE ME
     override def checkIsEqualOrBetterThan(e: Entity, other: EscapeProperty): Unit = {}
+
+    override def bottomness: Int = 0
 }
 
 /**
