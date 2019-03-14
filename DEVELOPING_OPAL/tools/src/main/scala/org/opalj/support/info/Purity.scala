@@ -414,10 +414,10 @@ object Purity {
                     "\nAt least d-s cont. side-effect free:   "+dContextuallySideEffectFree.size+
                     "\nImpure:                                "+lbImpure.size+
                     "\nTotal:                                 "+purityEs.size
-            Console.println(result)
-            Console.println(s"Call-graph time: $callGraphTime")
-            Console.println(s"Analysis time: $analysisTime")
-            Console.println(ps.statistics)
+            println(result)
+            println(s"Call-graph time: $callGraphTime")
+            println(s"Analysis time: $analysisTime")
+            println(ps.statistics.map(e ⇒ e._1+": "+e._2).mkString("Statistics:\n\t", "\n\t", "\n"))
         }
     }
 
