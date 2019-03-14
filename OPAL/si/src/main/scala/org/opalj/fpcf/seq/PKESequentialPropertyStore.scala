@@ -10,8 +10,10 @@ import java.util.ArrayDeque
 import scala.collection.mutable
 import scala.collection.mutable.AnyRefMap
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.LinkedHashMap
 
 import org.opalj.control.foreachWithIndex
+
 import org.opalj.log.LogContext
 import org.opalj.log.OPALLogger.{debug ⇒ trace}
 import org.opalj.fpcf.PropertyKind.SupportedPropertyKinds
@@ -111,12 +113,27 @@ final class PKESequentialPropertyStore private (
         Array.fill(PropertyKind.SupportedPropertyKinds) { mutable.AnyRefMap.empty }
     }
 
-    private[this] final val DefaultQueueId = 0
+    private[this] final val DefaultQueueId = 2
 
     // The list of scheduled computations
     //private[this] var tasks: ArrayDeque[QualifiedTask] = new ArrayDeque(50000)
     private[this] var tasks: Array[ArrayDeque[QualifiedTask]] = {
         Array.fill(10)(new ArrayDeque(50000))
+    }
+
+    private[this] var tasksPerQueueCount: Array[Int] = new Array[Int](10)
+
+    override def statistics: LinkedHashMap[String, Int] = {
+        val statistics = super.statistics
+        if (debug) {
+            statistics ++ tasksPerQueueCount
+                .zipWithIndex.map {
+                    case (count, queueId) ⇒
+                        (s"scheduled tasks in queue $queueId", count)
+                }
+        } else {
+            statistics
+        }
     }
 
     override def toString(printProperties: Boolean): String = {
@@ -310,7 +327,10 @@ final class PKESequentialPropertyStore private (
     )(
         pc: PropertyComputation[E]
     ): Unit = handleExceptions {
-        scheduledTasksCounter += 1
+        if (debug) {
+            scheduledTasksCounter += 1
+            tasksPerQueueCount(DefaultQueueId) += 1
+        }
         tasks(DefaultQueueId).addLast(new PropertyComputationTask(this, e, pc))
     }
 
@@ -319,7 +339,10 @@ final class PKESequentialPropertyStore private (
     )(
         pc: PropertyComputation[E]
     ): Unit = handleExceptions {
-        scheduledTasksCounter += 1
+        if (debug) {
+            scheduledTasksCounter += 1
+            tasksPerQueueCount(DefaultQueueId) += 1
+        }
         tasks(DefaultQueueId).addLast(new PropertyComputationTask(this, e, pc))
     }
 
@@ -403,7 +426,10 @@ final class PKESequentialPropertyStore private (
                         } else { // we have a very cheap property computation
                             tasks(queueId).addFirst(new HandleResultTask(this, c(eps)))
                         }
-                        scheduledOnUpdateComputationsCounter += 1
+                        if (debug) {
+                            tasksPerQueueCount(queueId) += 1
+                            scheduledOnUpdateComputationsCounter += 1
+                        }
                         removeDependerFromDependees(dependerEPK)
                     } else if (traceSuppressedNotifications) {
                         trace("analysis progress", s"suppressed notification: $eps → $dependerEPK")
@@ -473,7 +499,10 @@ final class PKESequentialPropertyStore private (
                 // but we postpone notification of other analyses which are
                 // depending on it until we have the updated value (minimize
                 // the overall number of notifications.)
-                scheduledOnUpdateComputationsCounter += 1
+                if (debug) {
+                    tasksPerQueueCount(DefaultQueueId) += 1
+                    scheduledOnUpdateComputationsCounter += 1
+                }
                 if (currentDependee.isFinal) {
                     val dependeeFinalP = currentDependee.asFinal
                     val t = OnFinalUpdateComputationTask(this, dependeeFinalP, c)
@@ -532,7 +561,10 @@ final class PKESequentialPropertyStore private (
 
                         case r ⇒
                             // Actually this shouldn't happen, though it is not a problem!
-                            scheduledOnUpdateComputationsCounter += 1
+                            if (debug) {
+                                tasksPerQueueCount(DefaultQueueId) += 1
+                                scheduledOnUpdateComputationsCounter += 1
+                            }
                             tasks(DefaultQueueId).addLast(HandleResultTask(store, r))
                             // The last comparable result still needs to be stored,
                             // but obviously, no further relevant computations need to be
@@ -654,13 +686,6 @@ final class PKESequentialPropertyStore private (
         var continueComputation: Boolean = false
         do {
             continueComputation = false
-
-            /*while (!tasks.isEmpty)) {
-                val task = tasks.pollFirst()
-                if (doTerminate) throw new InterruptedException()
-                task.apply()
-                assert(tasks.isEmpty)
-            }*/
             var foundTask = false
             do {
                 if (doTerminate) throw new InterruptedException()
