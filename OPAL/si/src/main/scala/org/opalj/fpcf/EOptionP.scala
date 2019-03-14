@@ -419,7 +419,7 @@ final class FinalEP[+E <: Entity, +P <: Property](val e: E, val p: P) extends EP
         eps:          SomeEPS,
         newDependees: Traversable[SomeEOptionP]
     ): Unit = {
-        throw new IllegalArgumentException("already final")
+        throw new IllegalArgumentException(s"$this is already final")
     }
 
     override def equals(other: Any): Boolean = {
