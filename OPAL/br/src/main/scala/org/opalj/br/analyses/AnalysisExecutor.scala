@@ -7,13 +7,16 @@ import java.net.URL
 import java.io.File
 
 import scala.util.control.ControlThrowable
+
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
+
 import org.opalj.br.reader.Java9LibraryFramework
 import org.opalj.log.OPALLogger
 import org.opalj.log.GlobalLogContext
 import org.opalj.log.LogContext
 import org.opalj.log.Info
+import org.opalj.fpcf.PropertyStore
 
 /**
  * Provides the necessary infrastructure to easily execute a given analysis that
@@ -57,6 +60,7 @@ trait AnalysisExecutor {
      *
      * @note The parameter `-cp=` is already predefined (see general documentation).
      * @note The parameter `-library=` is already predefined (see general documentation).
+     * @note The parameter `-debug` is already predefined (see general documentation).
      */
     def analysisSpecificParametersDescription: String = ""
 
@@ -88,6 +92,7 @@ trait AnalysisExecutor {
                 "[-libcp=<Directories or JAR/class files>]\n"+
                 "[-projectType=<the kind of project ("+projectTypes+")>]\n"+
                 "[-completelyLoadLibraries=<true|false> (Default: false.)]\n"+
+                "[-debug to enable the debugging support]\n"+
                 analysisSpecificParametersDescription
         )
         OPALLogger.info("general", "description: "+analysis.description)
@@ -208,14 +213,29 @@ trait AnalysisExecutor {
                 sys.exit(2)
         }
 
-        if (args4.nonEmpty)
-            OPALLogger.info("project configuration", "analysis specific paramters: "+args4.mkString(","))
-        val issues = checkAnalysisSpecificParameters(args4)
+        val (debug, args5) = try {
+            args4.partition(_ == "-debug") match {
+                case (Array(), args5)  ⇒ (false, args5)
+                case (Array(_), args5) ⇒ (true, args5)
+            }
+        } catch {
+            case t: Throwable ⇒
+                OPALLogger.error("project configuration", "failed parsing debug option", t)
+                printUsage
+                sys.exit(2)
+        }
+
+        if (args5.nonEmpty)
+            OPALLogger.info("project configuration", "analysis specific paramters: "+args5.mkString(","))
+        val issues = checkAnalysisSpecificParameters(args5)
         if (issues.nonEmpty) {
             issues.foreach { i ⇒ OPALLogger.error("project configuration", i) }
             printUsage
             sys.exit(2)
         }
+
+        // Adapt configuration:
+        PropertyStore.updateDebug(debug)
 
         //
         // 2. setup project context
