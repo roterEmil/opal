@@ -19,6 +19,7 @@ import org.opalj.br.fpcf.analyses.EagerL0PurityAnalysis
 import org.opalj.br.fpcf.analyses.LazyL0FieldMutabilityAnalysis
 import org.opalj.br.fpcf.properties.FieldMutability
 import org.opalj.br.fpcf.properties.Purity
+import org.opalj.br.DefinedMethod
 
 /**
  * Runs the purity analysis including all analyses that may improve the overall result.
@@ -68,7 +69,6 @@ object PurityAnalysisDemo extends DefaultOneStepAnalysis {
                     map(v ⇒ List("setup\t", "analysis\t").zip(v).map(e ⇒ e._1 + e._2).mkString("", "\n", "\n")).
                     mkString("\n")
             )
-
             gc()
         }
 
@@ -88,6 +88,11 @@ object PurityAnalysisDemo extends DefaultOneStepAnalysis {
         } { r ⇒ setupTime = r }
 
         time {
+            propertyStore.setupPhase(
+                (LazyL0FieldMutabilityAnalysis.derives.map(_.pk) ++
+                    EagerL0PurityAnalysis.derives.map(_.pk)).toSet,
+                Set.empty
+            )
             LazyL0FieldMutabilityAnalysis.register(project, propertyStore, null)
             EagerL0PurityAnalysis.start(project, propertyStore, null)
             propertyStore.waitOnPhaseCompletion()
@@ -107,7 +112,7 @@ object PurityAnalysisDemo extends DefaultOneStepAnalysis {
 
             val pureEntities: Iterator[EPS[Entity, Purity]] = propertyStore.entities(Purity.key)
             val pureMethods: Iterator[(Method, Property)] =
-                pureEntities.map(eps ⇒ (eps.e.asInstanceOf[Method], eps.ub))
+                pureEntities.map(eps ⇒ (eps.e.asInstanceOf[DefinedMethod].definedMethod, eps.ub))
             val pureMethodsAsStrings = pureMethods.map(m ⇒ m._2+" >> "+m._1.toJava)
 
             val fieldInfo =
@@ -125,7 +130,10 @@ object PurityAnalysisDemo extends DefaultOneStepAnalysis {
                 )
 
             fieldInfo + methodInfo + propertyStore.toString(false)+
-                "\nPure methods: "+pureMethods.filter(m ⇒ m._2 == Pure).size
+                "\nPure methods: "+pureMethods.filter(m ⇒ m._2 == Pure).size+"\n"+
+                propertyStore.statistics
+                .map(e ⇒ e._1+": "+e._2)
+                .mkString("Propertystore Statistics:\n\t", "\n\t", "\n")
         }
     }
 }
