@@ -378,6 +378,7 @@ object TestTaintAnalysisRunner {
             println(" -seq to use the SequentialPropertyStore")
             println(" -l1 to use the l2 domain instead of the default l1 domain")
             println(" -delay for a three seconds delay before the taint flow analysis is started")
+            println(" -debug to turn on the debug mode and to get more precise statistics")
         }
 
         val p = Project(bytecode.RTJar)
@@ -385,7 +386,7 @@ object TestTaintAnalysisRunner {
             PropertyStoreKey,
             (context: List[PropertyStoreContext[AnyRef]]) ⇒ {
                 implicit val lg: LogContext = p.logContext
-                PropertyStore.updateDebug(false)
+                PropertyStore.updateDebug(args.contains("-debug"))
                 val ps =
                     if (args.contains("-seq"))
                         PKESequentialPropertyStore.apply(context: _*)
