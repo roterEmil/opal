@@ -226,7 +226,7 @@ abstract class AbstractIFDSAnalysis[IFDSFact <: AbstractIFDSFact] extends FPCFAn
                 );
 
             case tac ⇒
-                throw new UnknownError(s"can't handle intermediate TACs ($tac)")
+                throw new UnknownError(s"can't handle intermediate TACs ($tac)");
         }
 
         // Start processing at the start of the cfg with the given source fact
