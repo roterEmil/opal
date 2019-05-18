@@ -40,12 +40,14 @@ import org.opalj.tac.ReturnValue
 import org.opalj.tac.Var
 import org.opalj.tac.fpcf.analyses.cg.CallGraphDeserializerScheduler
 
-trait Fact extends AbstractIFDSFact
+sealed trait Fact extends AbstractIFDSFact
 case class Variable(index: Int) extends Fact
 //case class ArrayElement(index: Int, element: Int) extends Fact
 case class StaticField(classType: ObjectType, fieldName: String) extends Fact
 case class InstanceField(index: Int, classType: ObjectType, fieldName: String) extends Fact
 case class FlowFact(flow: ListSet[Method]) extends Fact {
+    // ListSet is only meant for VERY SMALL sets, but this seems to be ok here!
+
     override val hashCode: Int = {
         // HERE, a foldLeft introduces a lot of overhead due to (un)boxing.
         var r = 1
@@ -58,7 +60,9 @@ case object NullFact extends Fact with AbstractIFDSNullFact
 /**
  * A simple IFDS taint analysis.
  *
- * @author Dominik Helm, Mario Trageser
+ * @author Dominik Helm
+ * @author Mario Trageser
+ * @author Michael Eichberg
  */
 class BasicIFDSTaintAnalysis private (
         implicit
@@ -75,6 +79,7 @@ class BasicIFDSTaintAnalysis private (
         stmt.stmt.astID match {
             case Assignment.ASTID ⇒
                 handleAssignment(stmt, stmt.stmt.asAssignment.expr, in)
+
             /*case ArrayStore.ASTID ⇒
                 val store = stmt.stmt.asArrayStore
                 val definedBy = store.arrayRef.asVar.definedBy
@@ -89,10 +94,14 @@ class BasicIFDSTaintAnalysis private (
                         // in ++ definedBy.iterator.map(Variable)
                         definedBy.foldLeft(in) { (c, n) ⇒ c + Variable(n) }
                 else in*/
+
             case PutStatic.ASTID ⇒
                 val put = stmt.stmt.asPutStatic
-                if (isTainted(put.value, in)) in + StaticField(put.declaringClass, put.name)
-                else in
+                if (isTainted(put.value, in))
+                    in + StaticField(put.declaringClass, put.name)
+                else
+                    in
+
             /*case PutField.ASTID ⇒
                 val put = stmt.stmt.asPutField
                 if (isTainted(put.value, in)) in + StaticField(put.declaringClass, put.name)
@@ -101,8 +110,12 @@ class BasicIFDSTaintAnalysis private (
                 val put = stmt.stmt.asPutField
                 val definedBy = put.objRef.asVar.definedBy
                 if (isTainted(put.value, in))
-                    in ++ definedBy.iterator.map(InstanceField(_, put.declaringClass, put.name))
-                else in
+                    definedBy.foldLeft(in) { (in, defSite) ⇒
+                        in + InstanceField(defSite, put.declaringClass, put.name)
+                    }
+                else
+                    in
+
             case _ ⇒ in
         }
 
@@ -170,7 +183,9 @@ class BasicIFDSTaintAnalysis private (
                 val get = expr.asGetStatic
                 if (in.contains(StaticField(get.declaringClass, get.name)))
                     in + Variable(stmt.index)
-                else in
+                else
+                    in
+
             /*case GetField.ASTID ⇒
             val get = expr.asGetField
             if (in.contains(StaticField(get.declaringClass, get.name)))
@@ -189,6 +204,7 @@ class BasicIFDSTaintAnalysis private (
                     in + Variable(stmt.index)
                 else
                     in
+
             case _ ⇒ in
         }
 
@@ -288,13 +304,15 @@ class BasicIFDSTaintAnalysis private (
             // Propagate taints of the return value
             if (exit.stmt.astID == ReturnValue.ASTID && stmt.stmt.astID == Assignment.ASTID) {
                 val returnValue = exit.stmt.asReturnValue.expr.asVar
-                flows ++= in.collect {
+                in foreach {
                     case Variable(index) if returnValue.definedBy.contains(index) ⇒
-                        Variable(stmt.index)
+                        flows += Variable(stmt.index)
                     /*case ArrayElement(index, taintedIndex) if returnValue.definedBy.contains(index) ⇒
                         ArrayElement(stmt.index, taintedIndex)*/
                     case InstanceField(index, declClass, taintedField) if returnValue.definedBy.contains(index) ⇒
-                        InstanceField(stmt.index, declClass, taintedField)
+                        flows += InstanceField(stmt.index, declClass, taintedField)
+
+                    case _ ⇒ // nothing to do
                 }
             }
 
@@ -305,8 +323,7 @@ class BasicIFDSTaintAnalysis private (
     /**
      * Converts a parameter origin to the index in the parameter seq (and vice-versa).
      */
-    def paramToIndex(param: Int, includeThis: Boolean): Int =
-        (if (includeThis) -1 else -2) - param
+    def paramToIndex(param: Int, includeThis: Boolean): Int = (if (includeThis) -1 else -2) - param
 
     override def callToReturnFlow(stmt: Statement, succ: Statement, in: Set[Fact]): Set[Fact] = {
         val call = asCall(stmt.stmt)
@@ -319,7 +336,8 @@ class BasicIFDSTaintAnalysis private (
                     }
                 case _ ⇒ true
             }
-        } else if (call.name == "forName" && (call.declaringClass eq ObjectType.Class) &&
+        } else if (call.name == "forName" &&
+            (call.declaringClass eq ObjectType.Class) &&
             call.descriptor.parameterTypes == RefArray(ObjectType.String)) {
             if (in.exists {
                 case Variable(index) ⇒
@@ -330,7 +348,7 @@ class BasicIFDSTaintAnalysis private (
                     println(s"flow: "+stmt.method.toJava)
                     in
                 } else*/
-                in ++ Set(FlowFact(ListSet(stmt.method)))
+                in + FlowFact(ListSet(stmt.method))
             } else {
                 in
             }
