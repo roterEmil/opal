@@ -157,6 +157,7 @@ class BasicIFDSTaintAnalysis private (
         expr.astID match {
             case Var.ASTID ⇒
                 // This path is not used if the representation is in standard SSA-like form.
+                // It is NOT optimized!
                 val newTaint = in.collect {
                     case Variable(index) if expr.asVar.definedBy.contains(index) ⇒
                         Some(Variable(stmt.index))
@@ -165,6 +166,7 @@ class BasicIFDSTaintAnalysis private (
                     case _ ⇒ None
                 }.flatten
                 in ++ newTaint
+
             /*case ArrayLoad.ASTID ⇒
             val load = expr.asArrayLoad
             if (in.exists {
@@ -180,6 +182,7 @@ class BasicIFDSTaintAnalysis private (
                 in + Variable(stmt.index)
             else
                 in*/
+                
             case GetStatic.ASTID ⇒
                 val get = expr.asGetStatic
                 if (in.contains(StaticField(get.declaringClass, get.name)))
