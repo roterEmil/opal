@@ -182,7 +182,7 @@ class BasicIFDSTaintAnalysis private (
                 in + Variable(stmt.index)
             else
                 in*/
-                
+
             case GetStatic.ASTID ⇒
                 val get = expr.asGetStatic
                 if (in.contains(StaticField(get.declaringClass, get.name)))
@@ -238,11 +238,13 @@ class BasicIFDSTaintAnalysis private (
         if (true || (callee.descriptor.returnType eq ObjectType.Class) ||
             (callee.descriptor.returnType eq ObjectType.Object) ||
             (callee.descriptor.returnType eq ObjectType.String)) {
-            in.collect {
+            var facts = Set.empty[Fact]
+            in.foreach {
                 case Variable(index) ⇒ // Taint formal parameter if actual parameter is tainted
-                    allParams.iterator.zipWithIndex.collect {
+                    allParams.iterator.zipWithIndex.foreach {
                         case (param, pIndex) if param.asVar.definedBy.contains(index) ⇒
-                            Variable(paramToIndex(pIndex, !callee.definedMethod.isStatic))
+                            facts += Variable(paramToIndex(pIndex, !callee.definedMethod.isStatic))
+                        case _ ⇒ // Nothing to do
                     }
 
                 /*case ArrayElement(index, taintedIndex) ⇒
@@ -255,14 +257,20 @@ class BasicIFDSTaintAnalysis private (
                 case InstanceField(index, declClass, taintedField) ⇒
                     // Taint field of formal parameter if field of actual parameter is tainted
                     // Only if the formal parameter is of a type that may have that field!
-                    allParams.iterator.zipWithIndex.collect {
+                    allParams.iterator.zipWithIndex.foreach {
                         case (param, pIndex) if param.asVar.definedBy.contains(index) &&
                             (paramToIndex(pIndex, !callee.definedMethod.isStatic) != -1 ||
                                 classHierarchy.isSubtypeOf(declClass, callee.declaringClassType)) ⇒
-                            InstanceField(paramToIndex(pIndex, !callee.definedMethod.isStatic), declClass, taintedField)
+                            facts += InstanceField(paramToIndex(pIndex, !callee.definedMethod.isStatic), declClass, taintedField)
+                        case _ ⇒ // Nothing to do
                     }
-                case sf: StaticField ⇒ Set(sf)
-            }.flatten
+
+                case sf: StaticField ⇒
+                    facts += sf
+
+                case _ ⇒ // Nothing to do
+            }
+            facts
         } else Set.empty
     }
 
