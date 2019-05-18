@@ -156,6 +156,7 @@ class BasicIFDSTaintAnalysis private (
     def handleAssignment(stmt: Statement, expr: Expr[V], in: Set[Fact]): Set[Fact] =
         expr.astID match {
             case Var.ASTID ⇒
+                // This path is not used if the representation is in standard SSA-like form.
                 val newTaint = in.collect {
                     case Variable(index) if expr.asVar.definedBy.contains(index) ⇒
                         Some(Variable(stmt.index))
@@ -213,30 +214,30 @@ class BasicIFDSTaintAnalysis private (
         callee: DeclaredMethod,
         in:     Set[Fact]
     ): Set[Fact] = {
-        val allParams = asCall(stmt.stmt).receiverOption ++ asCall(stmt.stmt).params
-        if (callee.name == "sink")
+        val call = asCall(stmt.stmt)
+        val allParams = call.allParams
+        if (callee.name == "sink") {
             if (in.exists {
-                case Variable(index) ⇒
-                    allParams.exists(p ⇒ p.asVar.definedBy.contains(index))
-                case _ ⇒ false
+                case Variable(index) ⇒ allParams.exists(p ⇒ p.asVar.definedBy.contains(index))
+                case _               ⇒ false
             }) {
                 println(s"Found flow: $stmt")
             }
-        if (callee.name == "forName" && (callee.declaringClassType eq ObjectType.Class) &&
-            callee.descriptor.parameterTypes == RefArray(ObjectType.String))
+        } else if (callee.name == "forName" && (callee.declaringClassType eq ObjectType.Class) &&
+            callee.descriptor.parameterTypes == RefArray(ObjectType.String)) {
             if (in.exists {
-                case Variable(index) ⇒
-                    asCall(stmt.stmt).params.exists(p ⇒ p.asVar.definedBy.contains(index))
-                case _ ⇒ false
+                case Variable(index) ⇒ call.params.exists(p ⇒ p.asVar.definedBy.contains(index))
+                case _               ⇒ false
             }) {
                 println(s"Found flow: $stmt")
             }
+        }
         if (true || (callee.descriptor.returnType eq ObjectType.Class) ||
             (callee.descriptor.returnType eq ObjectType.Object) ||
             (callee.descriptor.returnType eq ObjectType.String)) {
             in.collect {
                 case Variable(index) ⇒ // Taint formal parameter if actual parameter is tainted
-                    allParams.zipWithIndex.collect {
+                    allParams.iterator.zipWithIndex.collect {
                         case (param, pIndex) if param.asVar.definedBy.contains(index) ⇒
                             Variable(paramToIndex(pIndex, !callee.definedMethod.isStatic))
                     }
@@ -251,7 +252,7 @@ class BasicIFDSTaintAnalysis private (
                 case InstanceField(index, declClass, taintedField) ⇒
                     // Taint field of formal parameter if field of actual parameter is tainted
                     // Only if the formal parameter is of a type that may have that field!
-                    asCall(stmt.stmt).allParams.zipWithIndex.collect {
+                    allParams.iterator.zipWithIndex.collect {
                         case (param, pIndex) if param.asVar.definedBy.contains(index) &&
                             (paramToIndex(pIndex, !callee.definedMethod.isStatic) != -1 ||
                                 classHierarchy.isSubtypeOf(declClass, callee.declaringClassType)) ⇒
