@@ -392,7 +392,7 @@ abstract class AbstractIFDSAnalysis[IFDSFact <: AbstractIFDSFact] extends FPCFAn
             case FinalE(e: (DeclaredMethod, IFDSFact) @unchecked) ⇒ reAnalyzeCalls(state.pendingIfdsCallSites(e), e._1.definedMethod, Some(e._2))
 
             case interimEUBP @ InterimEUBP(e: (DeclaredMethod, IFDSFact) @unchecked, ub: IFDSProperty[IFDSFact]) ⇒
-                if (ub.flows.values.filter(!_.isInstanceOf[AbstractIFDSNullFact]).isEmpty) {
+                if (ub.flows.values.forall(_.isInstanceOf[AbstractIFDSNullFact])) {
                     // Do not re-analyze the caller if we only get the null fact.
                     // Update the pendingIfdsDependee entry to the new interim result.
                     state.pendingIfdsDependees += e → interimEUBP.asInstanceOf[EOptionP[(DeclaredMethod, IFDSFact), IFDSProperty[IFDSFact]]]
