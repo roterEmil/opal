@@ -348,9 +348,10 @@ abstract class AbstractIFDSAnalysis[IFDSFact <: AbstractIFDSFact] extends FPCFAn
             if (dependees.isEmpty) {
                 dependees = Seq(state.cgDependency.get)
             } else {
-                // We only implement what is required by the propery store!
+                // We only implement what is required by the propery store/interface
                 new Iterable[SomeEOptionP] {
                     override def iterator: Iterator[SomeEOptionP] = {
+                        // This method is actually not called by the property store..
                         Iterator.single(state.cgDependency.get) ++ dependees.toIterator
                     }
                     override def foreach[U](f: (SomeEOptionP) ⇒ U): Unit = {
