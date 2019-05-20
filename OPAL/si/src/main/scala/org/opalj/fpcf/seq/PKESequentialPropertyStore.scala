@@ -825,12 +825,12 @@ object PKESequentialPropertyStore extends PropertyStoreFactory {
         "ManyDirectDependersLast",
         "ManyDependeesOfDirectDependersLast",
         "ManyDependeesAndDependersOfDirectDependersLast",
-        "FIFO",
-        "LIFO" /*,
+        // "FIFO", // never seems to be among the very best ones
+        // "LIFO", // never seems to be among the very best ones
+        // "BackwardAllDependeesLast", // demonstrated horroble performance in all cases
+        // "BackwardAllDependeesFirst", // demonstrated horroble performance in all cases
         "ForwardAllDependeesLast",
-        "ForwardAllDependeesFirst",
-        "BackwardAllDependeesLast",
-        "BackwardAllDependeesFirst"*/
+        "ForwardAllDependeesFirst"
     )
 
     def apply(
