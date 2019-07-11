@@ -18,7 +18,7 @@ import org.opalj.log.LogContext
  *
  * @author Michael Eichberg
  */
-final class     PKEFJPoolPropertyStore private (
+final class PKEFJPoolPropertyStore private (
         val ctx:                                              Map[Class[_], AnyRef],
         val NumberOfThreadsForProcessingPropertyComputations: Int
 )(
@@ -48,9 +48,7 @@ final class     PKEFJPoolPropertyStore private (
 
     override def isIdle: Boolean = pool.isQuiescent
 
-    override protected[this] def parallelize(r: Runnable): Unit = {
-        pool.execute(r)
-    }
+    override protected[this] def parallelize(r: Runnable): Unit = pool.execute(r)
 
     override protected[this] def forkPropertyComputation[E <: Entity](
         e:  E,
@@ -79,7 +77,11 @@ final class     PKEFJPoolPropertyStore private (
         pool.execute(() ⇒ {
             if (doTerminate) throw new InterruptedException();
             val dependerState = properties(dependerEPK.pk.id).get(dependerEPK.e)
+<<<<<<< HEAD
             val c = dependerState.getAndClearOnUpdateComputation()
+=======
+            val c = dependerState.getAndClearOnUpdateComputation(dependerEPK)
+>>>>>>> 246a93fb659d83e23118b08b9c9eec329ab160cc
             if (c != null) {
                 // get the newest value before we actually call the onUpdateContinuation
                 val newEPS = store(e, pk).asEPS
